@@ -191,12 +191,13 @@ func (g *RPC) File(_ context.Context, u *model.User, r *model.Repo, b *model.Pip
 	return resp, g.client.Call("Plugin.File", args, &resp)
 }
 
-func (g *RPC) Dir(_ context.Context, u *model.User, r *model.Repo, b *model.Pipeline, f string) ([]*types.FileMeta, error) {
+func (g *RPC) Dir(_ context.Context, u *model.User, r *model.Repo, b *model.Pipeline, f string, depth int) ([]*types.FileMeta, error) {
 	args, err := json.Marshal(&argumentsFileDir{
-		U: modelUserFromModel(u),
-		R: modelRepoFromModel(r),
-		B: b,
-		F: f,
+		U:     modelUserFromModel(u),
+		R:     modelRepoFromModel(r),
+		B:     b,
+		F:     f,
+		Depth: depth,
 	})
 	if err != nil {
 		return nil, err

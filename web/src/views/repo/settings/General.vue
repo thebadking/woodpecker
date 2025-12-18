@@ -147,6 +147,24 @@
       </InputField>
 
       <InputField
+        v-slot="{ id }"
+        :label="$t('repo.settings.general.config_depth.depth')"
+      >
+        <div class="flex items-center gap-4">
+          <NumberField :id="id" v-model="repoSettings.config_path_depth" class="w-24" :min="0" :max="10" />
+          <span class="text-wp-text-alt-100">{{ $t('repo.settings.general.config_depth.desc') }}</span>
+        </div>
+      </InputField>
+
+      <InputField :label="$t('repo.settings.general.ignore_template.ignore_template')">
+        <Checkbox
+          v-model="repoSettings.ignore_template_files"
+          :label="$t('repo.settings.general.ignore_template.label')"
+          :description="$t('repo.settings.general.ignore_template.desc')"
+        />
+      </InputField>
+
+      <InputField
         docs-url="docs/usage/project-settings#cancel-previous-pipelines"
         :label="$t('repo.settings.general.cancel_prev.cancel')"
       >
@@ -205,6 +223,8 @@ const repoSettings = ref<RepoSettings>();
 function loadRepoSettings() {
   repoSettings.value = {
     config_file: repo.value.config_file,
+    config_path_depth: repo.value.config_path_depth || 0,
+    ignore_template_files: repo.value.ignore_template_files || false,
     timeout: repo.value.timeout,
     visibility: repo.value.visibility,
     require_approval: repo.value.require_approval,

@@ -15,8 +15,10 @@
 package config_test
 
 import (
+	"context"
 	"fmt"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -297,12 +299,12 @@ func TestFetch(t *testing.T) {
 			}
 
 			for path, files := range dirs {
-				f.On("Dir", mock.Anything, mock.Anything, mock.Anything, mock.Anything, path).Once().Return(files, nil)
+				f.On("Dir", mock.Anything, mock.Anything, mock.Anything, mock.Anything, path, mock.Anything).Once().Return(files, nil)
 			}
 
 			// if the previous mocks do not match return not found errors
 			f.On("File", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil, fmt.Errorf("file not found"))
-			f.On("Dir", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil, fmt.Errorf("directory not found"))
+			f.On("Dir", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil, fmt.Errorf("directory not found"))
 
 			configFetcher := config.NewForge(
 				time.Second*3,
@@ -328,6 +330,421 @@ func TestFetch(t *testing.T) {
 				matchingFiles[i] = files[i].Name
 			}
 			assert.ElementsMatch(t, tt.expectedFileNames, matchingFiles, "expected some other pipeline files")
+		})
+	}
+}
+
+func TestFetchWithDepthScanning(t *testing.T) {
+	t.Parallel()
+
+	type file struct {
+		name string
+		data []byte
+	}
+
+	dummyData := []byte("TEST")
+
+	testTable := []struct {
+		name              string
+		repoConfig        string
+		configPathDepth   int
+		files             []file
+		expectedFileNames []string
+		expectedError     bool
+	}{
+		{
+			name:            "Depth 0 - Only root files (default behavior)",
+			repoConfig:      "",
+			configPathDepth: 0,
+			files: []file{
+				{name: ".woodpecker/test.yml", data: dummyData},
+				{name: ".woodpecker/sub/config.yml", data: dummyData},
+			},
+			expectedFileNames: []string{".woodpecker/test.yml"},
+			expectedError:     false,
+		},
+		{
+			name:            "Depth 1 - Root and one level deep",
+			repoConfig:      "",
+			configPathDepth: 1,
+			files: []file{
+				{name: ".woodpecker/test.yml", data: dummyData},
+				{name: ".woodpecker/sub/config.yml", data: dummyData},
+				{name: ".woodpecker/sub/deep/nested.yml", data: dummyData},
+			},
+			expectedFileNames: []string{
+				".woodpecker/test.yml",
+				".woodpecker/sub/config.yml",
+			},
+			expectedError: false,
+		},
+		{
+			name:            "Depth 2 - Root and two levels deep",
+			repoConfig:      "",
+			configPathDepth: 2,
+			files: []file{
+				{name: ".woodpecker/test.yml", data: dummyData},
+				{name: ".woodpecker/sub/config.yml", data: dummyData},
+				{name: ".woodpecker/sub/deep/nested.yml", data: dummyData},
+				{name: ".woodpecker/sub/deep/deeper/too-deep.yml", data: dummyData},
+			},
+			expectedFileNames: []string{
+				".woodpecker/test.yml",
+				".woodpecker/sub/config.yml",
+				".woodpecker/sub/deep/nested.yml",
+			},
+			expectedError: false,
+		},
+		{
+			name:            "Depth 1 - Multiple subdirectories",
+			repoConfig:      "",
+			configPathDepth: 1,
+			files: []file{
+				{name: ".woodpecker/root.yml", data: dummyData},
+				{name: ".woodpecker/tests/test.yml", data: dummyData},
+				{name: ".woodpecker/build/build.yml", data: dummyData},
+				{name: ".woodpecker/deploy/deploy.yml", data: dummyData},
+			},
+			expectedFileNames: []string{
+				".woodpecker/root.yml",
+				".woodpecker/tests/test.yml",
+				".woodpecker/build/build.yml",
+				".woodpecker/deploy/deploy.yml",
+			},
+			expectedError: false,
+		},
+		{
+			name:            "Depth 1 - Custom config path",
+			repoConfig:      ".ci/",
+			configPathDepth: 1,
+			files: []file{
+				{name: ".ci/main.yml", data: dummyData},
+				{name: ".ci/tests/unit.yml", data: dummyData},
+			},
+			expectedFileNames: []string{
+				".ci/main.yml",
+				".ci/tests/unit.yml",
+			},
+			expectedError: false,
+		},
+	}
+
+	for _, tt := range testTable {
+		t.Run(tt.name, func(t *testing.T) {
+			repo := &model.Repo{
+				Owner:           "testowner",
+				Name:            "testrepo",
+				Config:          tt.repoConfig,
+				ConfigPathDepth: tt.configPathDepth,
+			}
+
+			f := mocks.NewMockForge(t)
+
+			// Set up mock to simulate recursive directory scanning based on depth
+			configPath := tt.repoConfig
+			if configPath == "" {
+				configPath = ".woodpecker/"
+			}
+			configPath = strings.TrimSuffix(configPath, "/")
+
+			// Mock Dir to return files based on depth
+			f.On("Dir", mock.Anything, mock.Anything, mock.Anything, mock.Anything, configPath, tt.configPathDepth).Return(
+				func(ctx context.Context, u *model.User, r *model.Repo, p *model.Pipeline, path string, depth int) []*forge_types.FileMeta {
+					var result []*forge_types.FileMeta
+					basePath := path + "/"
+					for _, file := range tt.files {
+						if !strings.HasPrefix(file.name, basePath) {
+							continue
+						}
+						relativePath := strings.TrimPrefix(file.name, basePath)
+						fileDepth := strings.Count(relativePath, "/")
+						if fileDepth <= depth {
+							result = append(result, &forge_types.FileMeta{
+								Name: file.name,
+								Data: file.data,
+							})
+						}
+					}
+					return result
+				},
+				nil,
+			)
+
+			f.On("File", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil, fmt.Errorf("file not found"))
+			f.On("Dir", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil, fmt.Errorf("directory not found"))
+
+			configFetcher := config.NewForge(time.Second*3, 3)
+			files, err := configFetcher.Fetch(
+				t.Context(),
+				f,
+				&model.User{AccessToken: "xxx"},
+				repo,
+				&model.Pipeline{Commit: "abc123"},
+				nil,
+				false,
+			)
+
+			if tt.expectedError && err == nil {
+				t.Fatal("expected an error")
+			} else if !tt.expectedError && err != nil {
+				t.Fatal("error fetching config:", err)
+			}
+
+			matchingFiles := make([]string, len(files))
+			for i := range files {
+				matchingFiles[i] = files[i].Name
+			}
+			assert.ElementsMatch(t, tt.expectedFileNames, matchingFiles, "expected different pipeline files")
+		})
+	}
+}
+
+func TestFetchWithTemplateFiltering(t *testing.T) {
+	t.Parallel()
+
+	type file struct {
+		name string
+		data []byte
+	}
+
+	dummyData := []byte("TEST")
+
+	testTable := []struct {
+		name                string
+		ignoreTemplateFiles bool
+		files               []file
+		expectedFileNames   []string
+	}{
+		{
+			name:                "Ignore template files disabled (default)",
+			ignoreTemplateFiles: false,
+			files: []file{
+				{name: ".woodpecker/test.yml", data: dummyData},
+				{name: ".woodpecker/template.yml", data: dummyData},
+				{name: ".woodpecker/my-template.yaml", data: dummyData},
+			},
+			expectedFileNames: []string{
+				".woodpecker/test.yml",
+				".woodpecker/template.yml",
+				".woodpecker/my-template.yaml",
+			},
+		},
+		{
+			name:                "Ignore template files enabled",
+			ignoreTemplateFiles: true,
+			files: []file{
+				{name: ".woodpecker/test.yml", data: dummyData},
+				{name: ".woodpecker/template.yml", data: dummyData},
+				{name: ".woodpecker/my-template.yaml", data: dummyData},
+			},
+			expectedFileNames: []string{
+				".woodpecker/test.yml",
+			},
+		},
+		{
+			name:                "Ignore template files - case insensitive",
+			ignoreTemplateFiles: true,
+			files: []file{
+				{name: ".woodpecker/test.yml", data: dummyData},
+				{name: ".woodpecker/TEMPLATE.yml", data: dummyData},
+				{name: ".woodpecker/Template.yaml", data: dummyData},
+				{name: ".woodpecker/my-TeMpLaTe.yml", data: dummyData},
+			},
+			expectedFileNames: []string{
+				".woodpecker/test.yml",
+			},
+		},
+		{
+			name:                "Ignore template files - with depth scanning",
+			ignoreTemplateFiles: true,
+			files: []file{
+				{name: ".woodpecker/build.yml", data: dummyData},
+				{name: ".woodpecker/templates/base-template.yml", data: dummyData},
+				{name: ".woodpecker/tests/unit.yml", data: dummyData},
+			},
+			expectedFileNames: []string{
+				".woodpecker/build.yml",
+				".woodpecker/tests/unit.yml",
+			},
+		},
+	}
+
+	for _, tt := range testTable {
+		t.Run(tt.name, func(t *testing.T) {
+			repo := &model.Repo{
+				Owner:               "testowner",
+				Name:                "testrepo",
+				Config:              "",
+				IgnoreTemplateFiles: tt.ignoreTemplateFiles,
+				ConfigPathDepth:     1, // Enable depth scanning for subdirs
+			}
+
+			f := mocks.NewMockForge(t)
+
+			// Mock Dir to return files based on depth
+			f.On("Dir", mock.Anything, mock.Anything, mock.Anything, mock.Anything, ".woodpecker", repo.ConfigPathDepth).Return(
+				func(ctx context.Context, u *model.User, r *model.Repo, p *model.Pipeline, path string, depth int) []*forge_types.FileMeta {
+					var result []*forge_types.FileMeta
+					basePath := path + "/"
+					for _, file := range tt.files {
+						if !strings.HasPrefix(file.name, basePath) {
+							continue
+						}
+						relativePath := strings.TrimPrefix(file.name, basePath)
+						fileDepth := strings.Count(relativePath, "/")
+						if fileDepth <= depth {
+							result = append(result, &forge_types.FileMeta{
+								Name: file.name,
+								Data: file.data,
+							})
+						}
+					}
+					return result
+				},
+				nil,
+			)
+
+			f.On("File", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil, fmt.Errorf("file not found"))
+			f.On("Dir", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil, fmt.Errorf("directory not found"))
+
+			configFetcher := config.NewForge(time.Second*3, 3)
+			files, err := configFetcher.Fetch(
+				t.Context(),
+				f,
+				&model.User{AccessToken: "xxx"},
+				repo,
+				&model.Pipeline{Commit: "abc123"},
+				nil,
+				false,
+			)
+
+			if err != nil {
+				t.Fatal("error fetching config:", err)
+			}
+
+			matchingFiles := make([]string, len(files))
+			for i := range files {
+				matchingFiles[i] = files[i].Name
+			}
+			assert.ElementsMatch(t, tt.expectedFileNames, matchingFiles, "expected different pipeline files")
+		})
+	}
+}
+
+func TestUniqueFileNameValidation(t *testing.T) {
+	t.Parallel()
+
+	type file struct {
+		name string
+		data []byte
+	}
+
+	dummyData := []byte("TEST")
+
+	testTable := []struct {
+		name          string
+		files         []file
+		expectedError bool
+		errorContains string
+	}{
+		{
+			name: "Unique file names - no error",
+			files: []file{
+				{name: ".woodpecker/test.yml", data: dummyData},
+				{name: ".woodpecker/build.yml", data: dummyData},
+				{name: ".woodpecker/deploy.yml", data: dummyData},
+			},
+			expectedError: false,
+		},
+		{
+			name: "Duplicate file names in different directories - error",
+			files: []file{
+				{name: ".woodpecker/test.yml", data: dummyData},
+				{name: ".woodpecker/sub/test.yml", data: dummyData},
+			},
+			expectedError: true,
+			errorContains: "duplicate config file name 'test'",
+		},
+		{
+			name: "Different file names in subdirectories - no error",
+			files: []file{
+				{name: ".woodpecker/build.yml", data: dummyData},
+				{name: ".woodpecker/tests/unit.yml", data: dummyData},
+				{name: ".woodpecker/deploy/prod.yml", data: dummyData},
+			},
+			expectedError: false,
+		},
+		{
+			name: "Duplicate with .yml and .yaml extensions - error",
+			files: []file{
+				{name: ".woodpecker/test.yml", data: dummyData},
+				{name: ".woodpecker/sub/test.yaml", data: dummyData},
+			},
+			expectedError: true,
+			errorContains: "duplicate config file name 'test'",
+		},
+	}
+
+	for _, tt := range testTable {
+		t.Run(tt.name, func(t *testing.T) {
+			repo := &model.Repo{
+				Owner:           "testowner",
+				Name:            "testrepo",
+				Config:          "",
+				ConfigPathDepth: 2, // Enable depth scanning
+			}
+
+			f := mocks.NewMockForge(t)
+
+			// Mock Dir to return files based on depth
+			f.On("Dir", mock.Anything, mock.Anything, mock.Anything, mock.Anything, ".woodpecker", repo.ConfigPathDepth).Return(
+				func(ctx context.Context, u *model.User, r *model.Repo, p *model.Pipeline, path string, depth int) []*forge_types.FileMeta {
+					var result []*forge_types.FileMeta
+					basePath := path + "/"
+					for _, file := range tt.files {
+						if !strings.HasPrefix(file.name, basePath) {
+							continue
+						}
+						relativePath := strings.TrimPrefix(file.name, basePath)
+						fileDepth := strings.Count(relativePath, "/")
+						if fileDepth <= depth {
+							result = append(result, &forge_types.FileMeta{
+								Name: file.name,
+								Data: file.data,
+							})
+						}
+					}
+					return result
+				},
+				nil,
+			)
+
+			f.On("File", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil, fmt.Errorf("file not found"))
+			f.On("Dir", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil, fmt.Errorf("directory not found"))
+
+			configFetcher := config.NewForge(time.Second*3, 3)
+			_, err := configFetcher.Fetch(
+				t.Context(),
+				f,
+				&model.User{AccessToken: "xxx"},
+				repo,
+				&model.Pipeline{Commit: "abc123"},
+				nil,
+				false,
+			)
+
+			if tt.expectedError {
+				if err == nil {
+					t.Fatal("expected an error but got none")
+				}
+				if tt.errorContains != "" && !assert.Contains(t, err.Error(), tt.errorContains) {
+					t.Fatalf("expected error to contain '%s', got: %s", tt.errorContains, err.Error())
+				}
+			} else {
+				if err != nil {
+					t.Fatal("unexpected error:", err)
+				}
+			}
 		})
 	}
 }

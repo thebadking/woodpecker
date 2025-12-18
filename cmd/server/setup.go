@@ -190,6 +190,10 @@ func setupEvilGlobals(ctx context.Context, c *cli.Command, s store.Store) (err e
 	}
 	server.Config.Pipeline.DefaultApprovalMode = approvalMode
 
+	// Configuration file scanning
+	server.Config.Pipeline.DefaultConfigPathDepth = c.Int("default-config-path-depth")
+	server.Config.Pipeline.DefaultIgnoreTemplateFiles = c.Bool("default-ignore-template-files")
+
 	// Cloning
 	server.Config.Pipeline.DefaultClonePlugin = c.String("default-clone-plugin")
 	server.Config.Pipeline.TrustedClonePlugins = c.StringSlice("plugins-trusted-clone")

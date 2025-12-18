@@ -67,6 +67,8 @@ var Config = struct {
 	Pipeline struct {
 		AuthenticatePublicRepos             bool
 		DefaultAllowPullRequests            bool
+		DefaultConfigPathDepth              int
+		DefaultIgnoreTemplateFiles          bool
 		DefaultCancelPreviousPipelineEvents []model.WebhookEvent
 		DefaultApprovalMode                 model.ApprovalMode
 		DefaultWorkflowLabels               map[string]string

@@ -68,6 +68,8 @@ type Repo struct {
 	AllowPull                    bool                 `json:"allow_pr"                        xorm:"allow_pr"`
 	AllowDeploy                  bool                 `json:"allow_deploy"                    xorm:"allow_deploy"`
 	Config                       string               `json:"config_file"                     xorm:"varchar(500) 'config_path'"`
+	ConfigPathDepth              int                  `json:"config_path_depth"               xorm:"DEFAULT 0 'config_path_depth'"`
+	IgnoreTemplateFiles          bool                 `json:"ignore_template_files"           xorm:"DEFAULT false 'ignore_template_files'"`
 	Hash                         string               `json:"-"                               xorm:"varchar(500) 'hash'"`
 	Perm                         *Perm                `json:"-"                               xorm:"-"`
 	CancelPreviousPipelineEvents []WebhookEvent       `json:"cancel_previous_pipeline_events" xorm:"json 'cancel_previous_pipeline_events'"`
@@ -134,6 +136,8 @@ func (r *Repo) Update(from *Repo) {
 // RepoPatch represents a repository patch object.
 type RepoPatch struct {
 	Config                       *string                    `json:"config_file,omitempty"`
+	ConfigPathDepth              *int                       `json:"config_path_depth,omitempty"`
+	IgnoreTemplateFiles          *bool                      `json:"ignore_template_files,omitempty"`
 	RequireApproval              *string                    `json:"require_approval,omitempty"`
 	ApprovalAllowedUsers         *[]string                  `json:"approval_allowed_users,omitempty"`
 	Timeout                      *int64                     `json:"timeout,omitempty"`

@@ -115,7 +115,7 @@ func (s *RPCServer) Dir(args []byte, resp *[]byte) error {
 	if err != nil {
 		return err
 	}
-	meta, err := s.Impl.Dir(mkCtx(), a.U.asModel(), a.R.asModel(), a.B, a.F)
+	meta, err := s.Impl.Dir(mkCtx(), a.U.asModel(), a.R.asModel(), a.B, a.F, a.Depth)
 	if err != nil {
 		return err
 	}

@@ -102,10 +102,9 @@ type Forge interface {
 	// Must fetch at specific commit (b.Commit), not branch head.
 	File(ctx context.Context, u *model.User, r *model.Repo, b *model.Pipeline, fileName string) ([]byte, error)
 
-	// Dir fetches all files in a directory at a specific commit.
-	// Supports pipeline configurations split across multiple files.
-	// Should return files only.
-	Dir(ctx context.Context, u *model.User, r *model.Repo, b *model.Pipeline, dirName string) ([]*types.FileMeta, error)
+	// Dir fetches a folder from the forge repository
+	// depth specifies how many levels deep to scan for files (0 = root only)
+	Dir(ctx context.Context, u *model.User, r *model.Repo, b *model.Pipeline, f string, depth int) ([]*types.FileMeta, error)
 
 	// Status sends workflow status updates to the forge.
 	// Provides visual feedback in forge UI (commit checks, PR status).

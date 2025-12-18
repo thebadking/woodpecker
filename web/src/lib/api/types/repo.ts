@@ -65,6 +65,10 @@ export interface Repo {
 
   config_file: string;
 
+  config_path_depth: number;
+
+  ignore_template_files: boolean;
+
   visibility: RepoVisibility;
 
   last_pipeline_number?: number;
@@ -102,6 +106,8 @@ export enum RepoRequireApproval {
 export type RepoSettings = Pick<
   Repo,
   | 'config_file'
+  | 'config_path_depth'
+  | 'ignore_template_files'
   | 'timeout'
   | 'visibility'
   | 'trusted'

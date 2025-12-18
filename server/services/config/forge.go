@@ -110,16 +110,37 @@ func (f *forgeFetcherContext) fetch(c context.Context, config string) ([]*types.
 	}
 }
 
-func filterPipelineFiles(files []*types.FileMeta) []*types.FileMeta {
+func (f *forgeFetcherContext) filterPipelineFiles(files []*types.FileMeta) []*types.FileMeta {
 	var res []*types.FileMeta
 
 	for _, file := range files {
 		if strings.HasSuffix(file.Name, ".yml") || strings.HasSuffix(file.Name, ".yaml") {
+			// Optionally ignore files with "template" in their name based on repo setting
+			if f.repo.IgnoreTemplateFiles && strings.Contains(strings.ToLower(file.Name), "template") {
+				continue
+			}
 			res = append(res, file)
 		}
 	}
 
 	return res
+}
+
+func validateUniqueFileNames(files []*types.FileMeta) error {
+	seen := make(map[string]string)
+	for _, file := range files {
+		// Extract the base name without extension and path
+		baseName := strings.TrimSuffix(strings.TrimSuffix(file.Name, ".yml"), ".yaml")
+		// Get just the filename without directory path
+		parts := strings.Split(baseName, "/")
+		fileName := parts[len(parts)-1]
+
+		if existingPath, exists := seen[fileName]; exists {
+			return fmt.Errorf("duplicate config file name '%s' found at paths: '%s' and '%s'", fileName, existingPath, file.Name)
+		}
+		seen[fileName] = file.Name
+	}
+	return nil
 }
 
 func (f *forgeFetcherContext) checkPipelineFile(c context.Context, config string) ([]*types.FileMeta, error) {
@@ -143,7 +164,10 @@ func (f *forgeFetcherContext) getFirstAvailableConfig(c context.Context, configs
 		log.Trace().Msgf("fetching %s from forge", fileOrFolder)
 		if strings.HasSuffix(fileOrFolder, "/") {
 			// config is a folder
-			files, err := f.forge.Dir(c, f.user, f.repo, f.pipeline, strings.TrimSuffix(fileOrFolder, "/"))
+			basePath := strings.TrimSuffix(fileOrFolder, "/")
+			// Pass the configured depth to Dir()
+			files, err := f.forge.Dir(c, f.user, f.repo, f.pipeline, basePath, f.repo.ConfigPathDepth)
+
 			// if folder is not supported we will get a "Not implemented" error and continue
 			if err != nil {
 				if !errors.Is(err, types.ErrNotImplemented) && !errors.Is(err, &types.ErrConfigNotFound{}) {
@@ -152,8 +176,13 @@ func (f *forgeFetcherContext) getFirstAvailableConfig(c context.Context, configs
 				}
 				continue
 			}
-			files = filterPipelineFiles(files)
+			files = f.filterPipelineFiles(files)
 			if len(files) != 0 {
+				// Validate that all file names are unique
+				if err := validateUniqueFileNames(files); err != nil {
+					log.Error().Err(err).Str("repo", f.repo.FullName).Msgf("duplicate config file names found")
+					return nil, err
+				}
 				log.Trace().Msgf("configFetcher[%s]: found %d files in '%s'", f.repo.FullName, len(files), fileOrFolder)
 				return files, nil
 			}

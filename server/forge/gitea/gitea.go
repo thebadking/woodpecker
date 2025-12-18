@@ -292,19 +292,23 @@ func (c *Gitea) File(ctx context.Context, u *model.User, r *model.Repo, b *model
 	return cfg, err
 }
 
-func (c *Gitea) Dir(ctx context.Context, u *model.User, r *model.Repo, b *model.Pipeline, f string) ([]*forge_types.FileMeta, error) {
-	var configs []*forge_types.FileMeta
-
+func (c *Gitea) Dir(ctx context.Context, u *model.User, r *model.Repo, b *model.Pipeline, f string, depth int) ([]*forge_types.FileMeta, error) {
 	client, err := c.newClientToken(ctx, u.AccessToken)
 	if err != nil {
 		return nil, err
 	}
 
+	return c.dirRecursive(ctx, u, r, b, f, depth, 0, client)
+}
+
+func (c *Gitea) dirRecursive(ctx context.Context, u *model.User, r *model.Repo, b *model.Pipeline, path string, maxDepth, currentDepth int, client *gitea.Client) ([]*forge_types.FileMeta, error) {
+	var configs []*forge_types.FileMeta
+
 	// List files in repository
-	contents, resp, err := client.ListContents(r.Owner, r.Name, b.Commit, f)
+	contents, resp, err := client.ListContents(r.Owner, r.Name, b.Commit, path)
 	if err != nil {
 		if resp != nil && resp.StatusCode == http.StatusNotFound {
-			return nil, errors.Join(err, &forge_types.ErrConfigNotFound{Configs: []string{f}})
+			return nil, errors.Join(err, &forge_types.ErrConfigNotFound{Configs: []string{path}})
 		}
 		return nil, err
 	}
@@ -320,6 +324,13 @@ func (c *Gitea) Dir(ctx context.Context, u *model.User, r *model.Repo, b *model.
 				Name: e.Path,
 				Data: data,
 			})
+		} else if e.Type == "dir" && currentDepth < maxDepth {
+			// Recursively scan subdirectories if we haven't reached max depth
+			subConfigs, err := c.dirRecursive(ctx, u, r, b, e.Path, maxDepth, currentDepth+1, client)
+			if err != nil {
+				return nil, err
+			}
+			configs = append(configs, subConfigs...)
 		}
 	}
 

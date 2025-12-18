@@ -31,10 +31,11 @@ type argumentsRepo struct {
 }
 
 type argumentsFileDir struct {
-	U *modelUser      `json:"u"`
-	R *modelRepo      `json:"r"`
-	B *model.Pipeline `json:"b"`
-	F string          `json:"f"`
+	U     *modelUser      `json:"u"`
+	R     *modelRepo      `json:"r"`
+	B     *model.Pipeline `json:"b"`
+	F     string          `json:"f"`
+	Depth int             `json:"depth"`
 }
 
 type argumentsStatus struct {

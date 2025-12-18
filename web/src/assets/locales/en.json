@@ -104,6 +104,15 @@
           "desc": "Path to your pipeline config (for example {0}). Folders should end with a {1}.",
           "desc_path_example": "my/path/"
         },
+        "config_depth": {
+          "depth": "Config Directory Scan Depth",
+          "desc": "How deep to scan for config files in subdirectories (0 = root only, 1 = root + 1 level, etc.)"
+        },
+        "ignore_template": {
+          "ignore_template": "Template Files",
+          "label": "Ignore template files",
+          "desc": "Ignore files containing 'template' in their name when scanning config directories"
+        },
         "allow_pr": {
           "allow": "Allow Pull Requests",
           "desc": "Allow the execution of pipelines on pull requests."

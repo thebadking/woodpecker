@@ -21,7 +21,6 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
-	"path/filepath"
 	"strconv"
 
 	"golang.org/x/oauth2"
@@ -235,36 +234,44 @@ func (c *config) File(ctx context.Context, u *model.User, r *model.Repo, p *mode
 }
 
 // Dir fetches a folder from the bitbucket repository.
-func (c *config) Dir(ctx context.Context, u *model.User, r *model.Repo, p *model.Pipeline, f string) ([]*forge_types.FileMeta, error) {
+func (c *config) Dir(ctx context.Context, u *model.User, r *model.Repo, p *model.Pipeline, f string, depth int) ([]*forge_types.FileMeta, error) {
+	client := c.newClient(ctx, u)
+	return c.dirRecursive(ctx, u, r, p, f, depth, 0, client)
+}
+
+func (c *config) dirRecursive(ctx context.Context, u *model.User, r *model.Repo, p *model.Pipeline, path string, maxDepth, currentDepth int, client *internal.Client) ([]*forge_types.FileMeta, error) {
 	var page *string
 	repoPathFiles := []*forge_types.FileMeta{}
-	client := c.newClient(ctx, u)
+	var directories []string
+
 	for {
-		filesResp, err := client.GetRepoFiles(r.Owner, r.Name, p.Commit, f, page)
+		filesResp, err := client.GetRepoFiles(r.Owner, r.Name, p.Commit, path, page)
 		if err != nil {
 			var rspErr internal.Error
 			if ok := errors.As(err, &rspErr); ok && rspErr.Status == http.StatusNotFound {
 				return nil, &forge_types.ErrConfigNotFound{
-					Configs: []string{f},
+					Configs: []string{path},
 				}
 			}
 			return nil, err
 		}
 		for _, file := range filesResp.Values {
-			_, filename := filepath.Split(file.Path)
-			repoFile := forge_types.FileMeta{
-				Name: filename,
-			}
 			if file.Type == "commit_file" {
-				fileData, err := c.newClient(ctx, u).FindSource(r.Owner, r.Name, p.Commit, file.Path)
+				fileData, err := client.FindSource(r.Owner, r.Name, p.Commit, file.Path)
 				if err != nil {
 					return nil, err
+				}
+				repoFile := forge_types.FileMeta{
+					Name: file.Path,
 				}
 				if fileData != nil {
 					repoFile.Data = []byte(*fileData)
 				}
+				repoPathFiles = append(repoPathFiles, &repoFile)
+			} else if file.Type == "commit_directory" && currentDepth < maxDepth {
+				// Collect directories for recursive scanning
+				directories = append(directories, file.Path)
 			}
-			repoPathFiles = append(repoPathFiles, &repoFile)
 		}
 
 		// Check for more results page
@@ -285,6 +292,16 @@ func (c *config) Dir(ctx context.Context, u *model.User, r *model.Repo, p *model
 		}
 		page = &nextPage
 	}
+
+	// Recursively scan subdirectories
+	for _, dir := range directories {
+		subFiles, err := c.dirRecursive(ctx, u, r, p, dir, maxDepth, currentDepth+1, client)
+		if err != nil {
+			return nil, err
+		}
+		repoPathFiles = append(repoPathFiles, subFiles...)
+	}
+
 	return repoPathFiles, nil
 }
 

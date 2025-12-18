@@ -96,6 +96,8 @@ func PostRepo(c *gin.Context) {
 		repo.AllowPull = server.Config.Pipeline.DefaultAllowPullRequests
 		repo.AllowDeploy = false
 		repo.CancelPreviousPipelineEvents = server.Config.Pipeline.DefaultCancelPreviousPipelineEvents
+		repo.ConfigPathDepth = server.Config.Pipeline.DefaultConfigPathDepth
+		repo.IgnoreTemplateFiles = server.Config.Pipeline.DefaultIgnoreTemplateFiles
 	}
 	repo.IsActive = true
 	repo.UserID = user.ID
@@ -268,6 +270,12 @@ func PatchRepo(c *gin.Context) {
 	}
 	if in.Config != nil {
 		repo.Config = *in.Config
+	}
+	if in.ConfigPathDepth != nil {
+		repo.ConfigPathDepth = *in.ConfigPathDepth
+	}
+	if in.IgnoreTemplateFiles != nil {
+		repo.IgnoreTemplateFiles = *in.IgnoreTemplateFiles
 	}
 	if in.CancelPreviousPipelineEvents != nil {
 		repo.CancelPreviousPipelineEvents = *in.CancelPreviousPipelineEvents

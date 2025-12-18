@@ -79,6 +79,8 @@ var Config = struct {
 		PrivilegedPlugins                   []string
 		DefaultTimeout                      int64
 		MaxTimeout                          int64
+		DefaultSecretPrefixPatterns         []string
+		DefaultSecretPrefixGroupingEnabled  bool
 		Proxy                               struct {
 			No    string
 			HTTP  string

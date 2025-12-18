@@ -164,6 +164,35 @@
         />
       </InputField>
 
+      <InputField :label="$t('repo.settings.general.secret_grouping.title')">
+        <Checkbox
+          v-model="repoSettings.secret_prefix_grouping_enabled"
+          :label="$t('repo.settings.general.secret_grouping.enabled_label')"
+          :description="$t('repo.settings.general.secret_grouping.enabled_desc')"
+        />
+      </InputField>
+
+      <InputField
+        v-if="repoSettings.secret_prefix_grouping_enabled"
+        :label="$t('repo.settings.general.secret_grouping.patterns_label')"
+      >
+        <template #default="{ id }">
+          <div class="flex flex-col gap-2">
+            <div v-for="(pattern, index) in repoSettings.secret_prefix_patterns" :key="index" class="flex gap-2">
+              <TextField :id="id" v-model="repoSettings.secret_prefix_patterns[index]" />
+              <Button type="button" color="gray" start-icon="trash" @click="removePattern(index)" />
+            </div>
+            <div class="flex gap-2">
+              <TextField :id="id" v-model="newPattern" :placeholder="$t('repo.settings.general.secret_grouping.pattern_placeholder')" @keydown.enter.prevent="addNewPattern" />
+              <Button type="button" color="gray" start-icon="plus" @click="addNewPattern" />
+            </div>
+          </div>
+        </template>
+        <template #description>
+          {{ $t('repo.settings.general.secret_grouping.patterns_desc') }}
+        </template>
+      </InputField>
+
       <InputField
         docs-url="docs/usage/project-settings#cancel-previous-pipelines"
         :label="$t('repo.settings.general.cancel_prev.cancel')"
@@ -225,6 +254,8 @@ function loadRepoSettings() {
     config_file: repo.value.config_file,
     config_path_depth: repo.value.config_path_depth || 0,
     ignore_template_files: repo.value.ignore_template_files || false,
+    secret_prefix_patterns: repo.value.secret_prefix_patterns || [],
+    secret_prefix_grouping_enabled: repo.value.secret_prefix_grouping_enabled || false,
     timeout: repo.value.timeout,
     visibility: repo.value.visibility,
     require_approval: repo.value.require_approval,
@@ -314,6 +345,24 @@ function removeUser(user: string) {
   }
 
   repoSettings.value.approval_allowed_users = repoSettings.value.approval_allowed_users.filter((i) => i !== user);
+}
+
+const newPattern = ref('');
+function addNewPattern() {
+  if (!newPattern.value) {
+    return;
+  }
+  if (!repoSettings.value) {
+    throw new Error('Unexpected: repoSettings should be set');
+  }
+  repoSettings.value.secret_prefix_patterns.push(newPattern.value);
+  newPattern.value = '';
+}
+function removePattern(index: number) {
+  if (!repoSettings.value) {
+    throw new Error('Unexpected: repoSettings should be set');
+  }
+  repoSettings.value.secret_prefix_patterns.splice(index, 1);
 }
 
 useWPTitle(computed(() => [i18n.t('repo.settings.general.project'), repo.value.full_name]));

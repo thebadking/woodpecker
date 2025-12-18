@@ -98,6 +98,8 @@ func PostRepo(c *gin.Context) {
 		repo.CancelPreviousPipelineEvents = server.Config.Pipeline.DefaultCancelPreviousPipelineEvents
 		repo.ConfigPathDepth = server.Config.Pipeline.DefaultConfigPathDepth
 		repo.IgnoreTemplateFiles = server.Config.Pipeline.DefaultIgnoreTemplateFiles
+		repo.SecretPrefixPatterns = server.Config.Pipeline.DefaultSecretPrefixPatterns
+		repo.SecretPrefixGroupingEnabled = server.Config.Pipeline.DefaultSecretPrefixGroupingEnabled
 	}
 	repo.IsActive = true
 	repo.UserID = user.ID
@@ -294,6 +296,12 @@ func PatchRepo(c *gin.Context) {
 	}
 	if in.ConfigExtensionEndpoint != nil {
 		repo.ConfigExtensionEndpoint = *in.ConfigExtensionEndpoint
+	}
+	if in.SecretPrefixPatterns != nil {
+		repo.SecretPrefixPatterns = *in.SecretPrefixPatterns
+	}
+	if in.SecretPrefixGroupingEnabled != nil {
+		repo.SecretPrefixGroupingEnabled = *in.SecretPrefixGroupingEnabled
 	}
 
 	err := _store.UpdateRepo(repo)

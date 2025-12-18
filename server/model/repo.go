@@ -75,6 +75,8 @@ type Repo struct {
 	CancelPreviousPipelineEvents []WebhookEvent       `json:"cancel_previous_pipeline_events" xorm:"json 'cancel_previous_pipeline_events'"`
 	NetrcTrustedPlugins          []string             `json:"netrc_trusted"                   xorm:"json 'netrc_trusted'"`
 	ConfigExtensionEndpoint      string               `json:"config_extension_endpoint"       xorm:"varchar(500) 'config_extension_endpoint'"`
+	SecretPrefixPatterns         []string             `json:"secret_prefix_patterns"          xorm:"json 'secret_prefix_patterns'"`
+	SecretPrefixGroupingEnabled  bool                 `json:"secret_prefix_grouping_enabled"  xorm:"DEFAULT false 'secret_prefix_grouping_enabled'"`
 } //	@name	Repo
 
 // TableName return database table name for xorm.
@@ -148,6 +150,8 @@ type RepoPatch struct {
 	NetrcTrusted                 *[]string                  `json:"netrc_trusted"`
 	Trusted                      *TrustedConfigurationPatch `json:"trusted"`
 	ConfigExtensionEndpoint      *string                    `json:"config_extension_endpoint,omitempty"`
+	SecretPrefixPatterns         *[]string                  `json:"secret_prefix_patterns,omitempty"`
+	SecretPrefixGroupingEnabled  *bool                      `json:"secret_prefix_grouping_enabled,omitempty"`
 } //	@name	RepoPatch
 
 type ForgeRemoteID string

@@ -164,6 +164,16 @@ export default class WoodpeckerClient extends ApiClient {
     return this._get(`/api/repos/${repoId}/secrets?${query}`) as Promise<Secret[] | null>;
   }
 
+  async getSecretListGrouped(repoId: number, opts?: PaginationOptions): Promise<{
+    enabled: boolean;
+    groups: Record<string, Secret[]> | null;
+    patterns: string[];
+    sorted_group_names: string[];
+  } | null> {
+    const query = encodeQueryString(opts);
+    return this._get(`/api/repos/${repoId}/secrets/groups?${query}`);
+  }
+
   async createSecret(repoId: number, secret: Partial<Secret>): Promise<unknown> {
     return this._post(`/api/repos/${repoId}/secrets`, secret);
   }

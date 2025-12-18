@@ -182,6 +182,17 @@ var flags = append([]cli.Flag{
 		Value:   false,
 	},
 	&cli.StringSliceFlag{
+		Sources: cli.EnvVars("WOODPECKER_DEFAULT_SECRET_PREFIX_PATTERNS"),
+		Name:    "default-secret-prefix-patterns",
+		Usage:   "Default prefix patterns for organizing secrets (e.g., 'PROD', 'STAGING', 'PROD_{??}').",
+	},
+	&cli.BoolFlag{
+		Sources: cli.EnvVars("WOODPECKER_DEFAULT_SECRET_PREFIX_GROUPING_ENABLED"),
+		Name:    "default-secret-prefix-grouping-enabled",
+		Usage:   "The default value for enabling secret prefix grouping in new repositories.",
+		Value:   false,
+	},
+	&cli.StringSliceFlag{
 		Sources: cli.EnvVars("WOODPECKER_DEFAULT_CANCEL_PREVIOUS_PIPELINE_EVENTS"),
 		Name:    "default-cancel-previous-pipeline-events",
 		Usage:   "List of event names that will be canceled when a new pipeline for the same context (tag, branch) is created.",

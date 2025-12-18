@@ -128,6 +128,7 @@ func apiRoutes(e *gin.RouterGroup) {
 
 					// requires push permissions
 					repo.GET("/secrets", session.MustPush, api.GetSecretList)
+					repo.GET("/secrets/groups", session.MustPush, api.GetSecretListGrouped)
 					repo.POST("/secrets", session.MustPush, api.PostSecret)
 					repo.GET("/secrets/:secret", session.MustPush, api.GetSecret)
 					repo.PATCH("/secrets/:secret", session.MustPush, api.PatchSecret)

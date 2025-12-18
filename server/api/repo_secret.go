@@ -22,6 +22,7 @@ import (
 	"go.woodpecker-ci.org/woodpecker/v3/server"
 	"go.woodpecker-ci.org/woodpecker/v3/server/model"
 	"go.woodpecker-ci.org/woodpecker/v3/server/router/middleware/session"
+	secretservice "go.woodpecker-ci.org/woodpecker/v3/server/services/secret"
 )
 
 // GetSecret
@@ -161,6 +162,53 @@ func GetSecretList(c *gin.Context) {
 		list[i] = secret.Copy()
 	}
 	c.JSON(http.StatusOK, list)
+}
+
+// GetSecretListGrouped
+//
+//	@Summary	List repository secrets grouped by prefix patterns
+//	@Router		/repos/{repo_id}/secrets/groups [get]
+//	@Produce	json
+//	@Success	200	{object}	object
+//	@Tags		Repository secrets
+//	@Param		Authorization	header	string	true	"Insert your personal access token"	default(Bearer <personal access token>)
+//	@Param		repo_id			path	int		true	"the repository id"
+//	@Param		page			query	int		false	"for response pagination, page offset number"	default(1)
+//	@Param		perPage			query	int		false	"for response pagination, max items per page"	default(50)
+func GetSecretListGrouped(c *gin.Context) {
+	repo := session.Repo(c)
+
+	// If grouping is not enabled, return ungrouped list
+	if !repo.SecretPrefixGroupingEnabled || len(repo.SecretPrefixPatterns) == 0 {
+		c.JSON(http.StatusOK, gin.H{
+			"enabled": false,
+			"groups":  nil,
+			"patterns": []string{},
+		})
+		return
+	}
+
+	secretService := server.Config.Services.Manager.SecretServiceFromRepo(repo)
+	list, err := secretService.SecretList(repo, session.Pagination(c))
+	if err != nil {
+		c.String(http.StatusInternalServerError, "Error getting secret list. %s", err)
+		return
+	}
+
+	// Copy secrets to remove sensitive fields
+	for i, secret := range list {
+		list[i] = secret.Copy()
+	}
+
+	// Group secrets using the grouping logic
+	groups := secretservice.GroupSecrets(list, repo.SecretPrefixPatterns)
+
+	c.JSON(http.StatusOK, gin.H{
+		"enabled": true,
+		"groups":  groups.Groups,
+		"patterns": groups.Patterns,
+		"sorted_group_names": groups.GetSortedGroupNames(),
+	})
 }
 
 // DeleteSecret

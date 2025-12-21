@@ -5193,6 +5193,9 @@ const docTemplate = `{
                 "config_file": {
                     "type": "string"
                 },
+                "config_path_depth": {
+                    "type": "integer"
+                },
                 "default_branch": {
                     "type": "string"
                 },
@@ -5211,6 +5214,9 @@ const docTemplate = `{
                 },
                 "id": {
                     "type": "integer"
+                },
+                "ignore_template_files": {
+                    "type": "boolean"
                 },
                 "name": {
                     "type": "string"
@@ -5286,6 +5292,9 @@ const docTemplate = `{
                 "config_file": {
                     "type": "string"
                 },
+                "config_path_depth": {
+                    "type": "integer"
+                },
                 "default_branch": {
                     "type": "string"
                 },
@@ -5304,6 +5313,9 @@ const docTemplate = `{
                 },
                 "id": {
                     "type": "integer"
+                },
+                "ignore_template_files": {
+                    "type": "boolean"
                 },
                 "last_pipeline": {
                     "$ref": "#/definitions/Pipeline"
@@ -5369,6 +5381,12 @@ const docTemplate = `{
                 },
                 "config_file": {
                     "type": "string"
+                },
+                "config_path_depth": {
+                    "type": "integer"
+                },
+                "ignore_template_files": {
+                    "type": "boolean"
                 },
                 "netrc_trusted": {
                     "type": "array",

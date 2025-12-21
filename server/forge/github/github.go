@@ -266,14 +266,17 @@ func (c *client) File(ctx context.Context, u *model.User, r *model.Repo, b *mode
 	return []byte(data), err
 }
 
-func (c *client) Dir(ctx context.Context, u *model.User, r *model.Repo, b *model.Pipeline, f string) ([]*forge_types.FileMeta, error) {
+func (c *client) Dir(ctx context.Context, u *model.User, r *model.Repo, b *model.Pipeline, f string, depth int) ([]*forge_types.FileMeta, error) {
 	client := c.newClientToken(ctx, u.AccessToken)
+	return c.dirRecursive(ctx, client, u, r, b, f, depth, 0)
+}
 
+func (c *client) dirRecursive(ctx context.Context, client *github.Client, u *model.User, r *model.Repo, b *model.Pipeline, path string, maxDepth, currentDepth int) ([]*forge_types.FileMeta, error) {
 	opts := new(github.RepositoryContentGetOptions)
 	opts.Ref = b.Commit
-	_, data, resp, err := client.Repositories.GetContents(ctx, r.Owner, r.Name, f, opts)
+	_, data, resp, err := client.Repositories.GetContents(ctx, r.Owner, r.Name, path, opts)
 	if resp != nil && resp.StatusCode == http.StatusNotFound {
-		return nil, errors.Join(err, &forge_types.ErrConfigNotFound{Configs: []string{f}})
+		return nil, errors.Join(err, &forge_types.ErrConfigNotFound{Configs: []string{path}})
 	}
 	if err != nil {
 		return nil, err
@@ -281,27 +284,36 @@ func (c *client) Dir(ctx context.Context, u *model.User, r *model.Repo, b *model
 
 	fc := make(chan *forge_types.FileMeta)
 	errChan := make(chan error)
+	var subdirs []*github.RepositoryContent
 
-	for _, file := range data {
-		go func(path string) {
-			content, err := c.File(ctx, u, r, b, path)
-			if err != nil {
-				if errors.Is(err, &forge_types.ErrConfigNotFound{}) {
-					err = fmt.Errorf("git tree reported existence of file but we got: %s", err.Error())
+	// First pass: collect files and directories
+	fileCount := 0
+	for _, item := range data {
+		if item.Type != nil && *item.Type == "file" {
+			fileCount++
+			go func(itemPath string) {
+				content, err := c.File(ctx, u, r, b, itemPath)
+				if err != nil {
+					if errors.Is(err, &forge_types.ErrConfigNotFound{}) {
+						err = fmt.Errorf("git tree reported existence of file but we got: %s", err.Error())
+					}
+					errChan <- err
+				} else {
+					fc <- &forge_types.FileMeta{
+						Name: itemPath,
+						Data: content,
+					}
 				}
-				errChan <- err
-			} else {
-				fc <- &forge_types.FileMeta{
-					Name: path,
-					Data: content,
-				}
-			}
-		}(f + "/" + *file.Name)
+			}(path + "/" + *item.Name)
+		} else if item.Type != nil && *item.Type == "dir" && currentDepth < maxDepth {
+			subdirs = append(subdirs, item)
+		}
 	}
 
 	var files []*forge_types.FileMeta
 
-	for i := 0; i < len(data); i++ {
+	// Collect file results
+	for i := 0; i < fileCount; i++ {
 		select {
 		case err := <-errChan:
 			return nil, err
@@ -312,6 +324,16 @@ func (c *client) Dir(ctx context.Context, u *model.User, r *model.Repo, b *model
 
 	close(fc)
 	close(errChan)
+
+	// Recursively scan subdirectories
+	for _, subdir := range subdirs {
+		subdirPath := path + "/" + *subdir.Name
+		subFiles, err := c.dirRecursive(ctx, client, u, r, b, subdirPath, maxDepth, currentDepth+1)
+		if err != nil {
+			return nil, err
+		}
+		files = append(files, subFiles...)
+	}
 
 	return files, nil
 }

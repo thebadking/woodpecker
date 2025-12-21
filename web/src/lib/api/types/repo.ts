@@ -65,6 +65,14 @@ export interface Repo {
 
   config_file: string;
 
+  config_path_depth: number;
+
+  ignore_template_files: boolean;
+
+  secret_prefix_patterns: string[];
+
+  secret_prefix_grouping_enabled: boolean;
+
   visibility: RepoVisibility;
 
   last_pipeline_number?: number;
@@ -102,6 +110,10 @@ export enum RepoRequireApproval {
 export type RepoSettings = Pick<
   Repo,
   | 'config_file'
+  | 'config_path_depth'
+  | 'ignore_template_files'
+  | 'secret_prefix_patterns'
+  | 'secret_prefix_grouping_enabled'
   | 'timeout'
   | 'visibility'
   | 'trusted'

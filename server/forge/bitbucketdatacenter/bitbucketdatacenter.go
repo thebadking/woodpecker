@@ -294,12 +294,16 @@ func (c *client) File(ctx context.Context, u *model.User, r *model.Repo, p *mode
 	return b, nil
 }
 
-func (c *client) Dir(ctx context.Context, u *model.User, r *model.Repo, p *model.Pipeline, path string) ([]*forge_types.FileMeta, error) {
+func (c *client) Dir(ctx context.Context, u *model.User, r *model.Repo, p *model.Pipeline, path string, depth int) ([]*forge_types.FileMeta, error) {
 	bc, err := c.newClient(ctx, u)
 	if err != nil {
 		return nil, fmt.Errorf("unable to create bitbucket client: %w", err)
 	}
 
+	return c.dirRecursive(ctx, bc, u, r, p, path, depth, 0)
+}
+
+func (c *client) dirRecursive(ctx context.Context, bc *bb.Client, u *model.User, r *model.Repo, p *model.Pipeline, path string, maxDepth, currentDepth int) ([]*forge_types.FileMeta, error) {
 	opts := &bb.FilesListOptions{At: p.Commit}
 	all := make([]*forge_types.FileMeta, 0)
 	for {
@@ -326,6 +330,14 @@ func (c *client) Dir(ctx context.Context, u *model.User, r *model.Repo, p *model
 		}
 		opts.Start = resp.NextPageStart
 	}
+
+	// Note: Bitbucket Datacenter's ListFiles API only returns file names in the specified directory.
+	// It does not provide information about subdirectories, making recursive directory scanning
+	// challenging without additional API support. For now, depth scanning is not fully supported.
+	// If depth > 0 is requested, only the root level will be scanned.
+	_ = maxDepth     // Acknowledge the parameter
+	_ = currentDepth // Acknowledge the parameter
+
 	return all, nil
 }
 

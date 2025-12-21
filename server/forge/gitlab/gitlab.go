@@ -387,17 +387,22 @@ func (g *GitLab) File(ctx context.Context, user *model.User, repo *model.Repo, p
 }
 
 // Dir fetches a folder from the forge repository.
-func (g *GitLab) Dir(ctx context.Context, user *model.User, repo *model.Repo, pipeline *model.Pipeline, path string) ([]*forge_types.FileMeta, error) {
+func (g *GitLab) Dir(ctx context.Context, user *model.User, repo *model.Repo, pipeline *model.Pipeline, path string, depth int) ([]*forge_types.FileMeta, error) {
 	client, err := newClient(g.url, user.AccessToken, g.skipVerify)
 	if err != nil {
 		return nil, err
 	}
 
-	files := make([]*forge_types.FileMeta, 0, defaultPerPage)
 	_repo, err := g.getProject(ctx, client, repo.ForgeRemoteID, repo.Owner, repo.Name)
 	if err != nil {
 		return nil, err
 	}
+
+	return g.dirRecursive(ctx, user, repo, pipeline, path, depth, 0, client, _repo.ID)
+}
+
+func (g *GitLab) dirRecursive(ctx context.Context, user *model.User, repo *model.Repo, pipeline *model.Pipeline, path string, maxDepth, currentDepth int, client *gitlab.Client, projectID any) ([]*forge_types.FileMeta, error) {
+	files := make([]*forge_types.FileMeta, 0, defaultPerPage)
 
 	opts := &gitlab.ListTreeOptions{
 		ListOptions: gitlab.ListOptions{PerPage: defaultPerPage},
@@ -406,33 +411,46 @@ func (g *GitLab) Dir(ctx context.Context, user *model.User, repo *model.Repo, pi
 		Recursive:   gitlab.Ptr(false),
 	}
 
+	var directories []string
+
 	for i := 1; true; i++ {
 		opts.Page = 1
-		batch, _, err := client.Repositories.ListTree(_repo.ID, opts, gitlab.WithContext(ctx))
+		batch, _, err := client.Repositories.ListTree(projectID, opts, gitlab.WithContext(ctx))
 		if err != nil {
 			return nil, err
 		}
 
 		for i := range batch {
-			if batch[i].Type != "blob" { // no file
-				continue
-			}
-			data, err := g.File(ctx, user, repo, pipeline, batch[i].Path)
-			if err != nil {
-				if errors.Is(err, &forge_types.ErrConfigNotFound{}) {
-					return nil, fmt.Errorf("git tree reported existence of file but we got: %s", err.Error())
+			if batch[i].Type == "blob" { // file
+				data, err := g.File(ctx, user, repo, pipeline, batch[i].Path)
+				if err != nil {
+					if errors.Is(err, &forge_types.ErrConfigNotFound{}) {
+						return nil, fmt.Errorf("git tree reported existence of file but we got: %s", err.Error())
+					}
+					return nil, err
 				}
-				return nil, err
+				files = append(files, &forge_types.FileMeta{
+					Name: batch[i].Path,
+					Data: data,
+				})
+			} else if batch[i].Type == "tree" && currentDepth < maxDepth {
+				// Collect directories for recursive scanning
+				directories = append(directories, batch[i].Path)
 			}
-			files = append(files, &forge_types.FileMeta{
-				Name: batch[i].Path,
-				Data: data,
-			})
 		}
 
 		if len(batch) < defaultPerPage {
 			break
 		}
+	}
+
+	// Recursively scan subdirectories
+	for _, dir := range directories {
+		subFiles, err := g.dirRecursive(ctx, user, repo, pipeline, dir, maxDepth, currentDepth+1, client, projectID)
+		if err != nil {
+			return nil, err
+		}
+		files = append(files, subFiles...)
 	}
 
 	return files, nil

@@ -411,8 +411,8 @@ func (_c *MockForge_Deactivate_Call) RunAndReturn(run func(ctx context.Context, 
 }
 
 // Dir provides a mock function for the type MockForge
-func (_mock *MockForge) Dir(ctx context.Context, u *model.User, r *model.Repo, b *model.Pipeline, dirName string) ([]*types.FileMeta, error) {
-	ret := _mock.Called(ctx, u, r, b, dirName)
+func (_mock *MockForge) Dir(ctx context.Context, u *model.User, r *model.Repo, b *model.Pipeline, dirName string, depth int) ([]*types.FileMeta, error) {
+	ret := _mock.Called(ctx, u, r, b, dirName, depth)
 
 	if len(ret) == 0 {
 		panic("no return value specified for Dir")
@@ -420,18 +420,18 @@ func (_mock *MockForge) Dir(ctx context.Context, u *model.User, r *model.Repo, b
 
 	var r0 []*types.FileMeta
 	var r1 error
-	if returnFunc, ok := ret.Get(0).(func(context.Context, *model.User, *model.Repo, *model.Pipeline, string) ([]*types.FileMeta, error)); ok {
-		return returnFunc(ctx, u, r, b, dirName)
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *model.User, *model.Repo, *model.Pipeline, string, int) ([]*types.FileMeta, error)); ok {
+		return returnFunc(ctx, u, r, b, dirName, depth)
 	}
-	if returnFunc, ok := ret.Get(0).(func(context.Context, *model.User, *model.Repo, *model.Pipeline, string) []*types.FileMeta); ok {
-		r0 = returnFunc(ctx, u, r, b, dirName)
+	if returnFunc, ok := ret.Get(0).(func(context.Context, *model.User, *model.Repo, *model.Pipeline, string, int) []*types.FileMeta); ok {
+		r0 = returnFunc(ctx, u, r, b, dirName, depth)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).([]*types.FileMeta)
 		}
 	}
-	if returnFunc, ok := ret.Get(1).(func(context.Context, *model.User, *model.Repo, *model.Pipeline, string) error); ok {
-		r1 = returnFunc(ctx, u, r, b, dirName)
+	if returnFunc, ok := ret.Get(1).(func(context.Context, *model.User, *model.Repo, *model.Pipeline, string, int) error); ok {
+		r1 = returnFunc(ctx, u, r, b, dirName, depth)
 	} else {
 		r1 = ret.Error(1)
 	}
@@ -449,11 +449,12 @@ type MockForge_Dir_Call struct {
 //   - r *model.Repo
 //   - b *model.Pipeline
 //   - dirName string
-func (_e *MockForge_Expecter) Dir(ctx interface{}, u interface{}, r interface{}, b interface{}, dirName interface{}) *MockForge_Dir_Call {
-	return &MockForge_Dir_Call{Call: _e.mock.On("Dir", ctx, u, r, b, dirName)}
+//   - depth int
+func (_e *MockForge_Expecter) Dir(ctx interface{}, u interface{}, r interface{}, b interface{}, dirName interface{}, depth interface{}) *MockForge_Dir_Call {
+	return &MockForge_Dir_Call{Call: _e.mock.On("Dir", ctx, u, r, b, dirName, depth)}
 }
 
-func (_c *MockForge_Dir_Call) Run(run func(ctx context.Context, u *model.User, r *model.Repo, b *model.Pipeline, dirName string)) *MockForge_Dir_Call {
+func (_c *MockForge_Dir_Call) Run(run func(ctx context.Context, u *model.User, r *model.Repo, b *model.Pipeline, dirName string, depth int)) *MockForge_Dir_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		var arg0 context.Context
 		if args[0] != nil {
@@ -475,12 +476,17 @@ func (_c *MockForge_Dir_Call) Run(run func(ctx context.Context, u *model.User, r
 		if args[4] != nil {
 			arg4 = args[4].(string)
 		}
+		var arg5 int
+		if args[5] != nil {
+			arg5 = args[5].(int)
+		}
 		run(
 			arg0,
 			arg1,
 			arg2,
 			arg3,
 			arg4,
+			arg5,
 		)
 	})
 	return _c

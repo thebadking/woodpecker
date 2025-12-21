@@ -212,12 +212,12 @@ func TestFetchFromConfigService(t *testing.T) {
 			}
 
 			for path, files := range dirs {
-				f.On("Dir", mock.Anything, mock.Anything, mock.Anything, mock.Anything, path).Return(files, nil)
+				f.On("Dir", mock.Anything, mock.Anything, mock.Anything, mock.Anything, path, mock.Anything).Return(files, nil)
 			}
 
 			// if the previous mocks do not match return not found errors
 			f.On("File", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil, fmt.Errorf("file not found"))
-			f.On("Dir", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil, fmt.Errorf("directory not found"))
+			f.On("Dir", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil, fmt.Errorf("directory not found"))
 
 			f.On("Netrc", mock.Anything, mock.Anything).Return(&model.Netrc{Machine: "mock", Login: "mock", Password: "mock"}, nil)
 

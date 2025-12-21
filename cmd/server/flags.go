@@ -169,6 +169,29 @@ var flags = append([]cli.Flag{
 		Usage:   "The default value for allowing pull requests on a repo.",
 		Value:   "forks",
 	},
+	&cli.IntFlag{
+		Sources: cli.EnvVars("WOODPECKER_DEFAULT_CONFIG_PATH_DEPTH"),
+		Name:    "default-config-path-depth",
+		Usage:   "The default depth for scanning subdirectories in the config path (0 = root only, 1 = root + 1 level, etc.)",
+		Value:   0,
+	},
+	&cli.BoolFlag{
+		Sources: cli.EnvVars("WOODPECKER_DEFAULT_IGNORE_TEMPLATE_FILES"),
+		Name:    "default-ignore-template-files",
+		Usage:   "The default value for ignoring files with 'template' in their name when scanning config directories.",
+		Value:   false,
+	},
+	&cli.StringSliceFlag{
+		Sources: cli.EnvVars("WOODPECKER_DEFAULT_SECRET_PREFIX_PATTERNS"),
+		Name:    "default-secret-prefix-patterns",
+		Usage:   "Default prefix patterns for organizing secrets (e.g., 'PROD', 'STAGING', 'PROD_{??}').",
+	},
+	&cli.BoolFlag{
+		Sources: cli.EnvVars("WOODPECKER_DEFAULT_SECRET_PREFIX_GROUPING_ENABLED"),
+		Name:    "default-secret-prefix-grouping-enabled",
+		Usage:   "The default value for enabling secret prefix grouping in new repositories.",
+		Value:   false,
+	},
 	&cli.StringSliceFlag{
 		Sources: cli.EnvVars("WOODPECKER_DEFAULT_CANCEL_PREVIOUS_PIPELINE_EVENTS"),
 		Name:    "default-cancel-previous-pipeline-events",

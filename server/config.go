@@ -67,6 +67,8 @@ var Config = struct {
 	Pipeline struct {
 		AuthenticatePublicRepos             bool
 		DefaultAllowPullRequests            bool
+		DefaultConfigPathDepth              int
+		DefaultIgnoreTemplateFiles          bool
 		DefaultCancelPreviousPipelineEvents []model.WebhookEvent
 		DefaultApprovalMode                 model.ApprovalMode
 		DefaultWorkflowLabels               map[string]string
@@ -77,6 +79,8 @@ var Config = struct {
 		PrivilegedPlugins                   []string
 		DefaultTimeout                      int64
 		MaxTimeout                          int64
+		DefaultSecretPrefixPatterns         []string
+		DefaultSecretPrefixGroupingEnabled  bool
 		Proxy                               struct {
 			No    string
 			HTTP  string

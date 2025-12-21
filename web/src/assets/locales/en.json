@@ -104,6 +104,23 @@
           "desc": "Path to your pipeline config (for example {0}). Folders should end with a {1}.",
           "desc_path_example": "my/path/"
         },
+        "config_depth": {
+          "depth": "Config Directory Scan Depth",
+          "desc": "How deep to scan for config files in subdirectories (0 = root only, 1 = root + 1 level, etc.)"
+        },
+        "ignore_template": {
+          "ignore_template": "Template Files",
+          "label": "Ignore template files",
+          "desc": "Ignore files containing 'template' in their name when scanning config directories"
+        },
+        "secret_grouping": {
+          "title": "Secret Organization",
+          "enabled_label": "Enable secret prefix grouping",
+          "enabled_desc": "Organize secrets into tabs based on prefix patterns (e.g., PROD, STAGING). Secrets not matching any pattern will appear in the 'General' tab.",
+          "patterns_label": "Prefix Patterns",
+          "patterns_desc": "Define patterns to group secrets. Examples: 'PROD' matches PROD_*, 'PROD_' followed by two characters matches PROD_AE_* and PROD_DE_*, etc. Use the format PREFIX for simple matching.",
+          "pattern_placeholder": "e.g., PROD, STAGING, DOCKER"
+        },
         "allow_pr": {
           "allow": "Allow Pull Requests",
           "desc": "Allow the execution of pipelines on pull requests."

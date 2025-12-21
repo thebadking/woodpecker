@@ -157,13 +157,13 @@ func TestBitbucket(t *testing.T) {
 	_, err = c.PullRequests(ctx, fakeUser, fakeRepoNotFound, &listOpts)
 	assert.Error(t, err)
 
-	files, err := c.Dir(ctx, fakeUser, fakeRepo, fakePipeline, "dir")
+	files, err := c.Dir(ctx, fakeUser, fakeRepo, fakePipeline, "dir", 0)
 	assert.NoError(t, err)
-	assert.Len(t, files, 3)
+	assert.Len(t, files, 2) // depth=0 returns only root-level files (README.md and .gitignore), not directories
 	assert.Equal(t, "README.md", files[0].Name)
 	assert.Equal(t, "dummy payload", string(files[0].Data))
 
-	_, err = c.Dir(ctx, fakeUser, fakeRepo, fakePipeline, "dir_not_found")
+	_, err = c.Dir(ctx, fakeUser, fakeRepo, fakePipeline, "dir_not_found", 0)
 	assert.Error(t, err)
 	assert.ErrorIs(t, err, &types.ErrConfigNotFound{})
 

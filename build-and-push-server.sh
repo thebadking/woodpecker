@@ -32,6 +32,7 @@ docker build \
   --build-arg TARGETOS=${TARGETOS} \
   --build-arg TARGETARCH=${TARGETARCH} \
   --build-arg CI_COMMIT_SHA=${COMMIT_SHA} \
+  --build-arg CI_COMMIT_TAG=${TAG} \
   -f docker/Dockerfile.server.build \
   -t ${REGISTRY}/${IMAGE_NAME}:${TAG} \
   -t ${IMAGE_NAME}:${TAG} \

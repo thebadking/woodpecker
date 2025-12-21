@@ -160,6 +160,8 @@ func (f *forgeFetcherContext) checkPipelineFile(c context.Context, config string
 
 func (f *forgeFetcherContext) getFirstAvailableConfig(c context.Context, configs []string) ([]*types.FileMeta, error) {
 	var forgeErr []error
+	var debugInfo []string
+
 	for _, fileOrFolder := range configs {
 		log.Trace().Msgf("fetching %s from forge", fileOrFolder)
 		if strings.HasSuffix(fileOrFolder, "/") {
@@ -173,9 +175,19 @@ func (f *forgeFetcherContext) getFirstAvailableConfig(c context.Context, configs
 				if !errors.Is(err, types.ErrNotImplemented) && !errors.Is(err, &types.ErrConfigNotFound{}) {
 					log.Error().Err(err).Str("repo", f.repo.FullName).Str("user", f.user.Login).Msgf("could not get folder from forge: %s", err)
 					forgeErr = append(forgeErr, err)
+					debugInfo = append(debugInfo, fmt.Sprintf("%s: error - %v", fileOrFolder, err))
+				} else {
+					debugInfo = append(debugInfo, fmt.Sprintf("%s: not found or not implemented", fileOrFolder))
 				}
 				continue
 			}
+
+			// Log what was returned before filtering
+			allFileNames := make([]string, len(files))
+			for i, file := range files {
+				allFileNames[i] = file.Name
+			}
+
 			files = f.filterPipelineFiles(files)
 			if len(files) != 0 {
 				// Validate that all file names are unique
@@ -183,17 +195,28 @@ func (f *forgeFetcherContext) getFirstAvailableConfig(c context.Context, configs
 					log.Error().Err(err).Str("repo", f.repo.FullName).Msgf("duplicate config file names found")
 					return nil, err
 				}
-				log.Trace().Msgf("configFetcher[%s]: found %d files in '%s'", f.repo.FullName, len(files), fileOrFolder)
+				fileNames := make([]string, len(files))
+				for i, file := range files {
+					fileNames[i] = file.Name
+				}
+				log.Info().Str("repo", f.repo.FullName).Msgf("found %d config files in '%s': %v", len(files), fileOrFolder, fileNames)
 				return files, nil
+			} else {
+				msg := fmt.Sprintf("%s: found %d items but none are .yml/.yaml files: %v", fileOrFolder, len(allFileNames), allFileNames)
+				log.Debug().Str("repo", f.repo.FullName).Msg(msg)
+				debugInfo = append(debugInfo, msg)
 			}
 		}
 
 		// config is a file
 		if fileMeta, err := f.checkPipelineFile(c, fileOrFolder); err == nil {
-			log.Trace().Msgf("configFetcher[%s]: found file: '%s'", f.repo.FullName, fileOrFolder)
+			log.Info().Str("repo", f.repo.FullName).Msgf("found config file: '%s'", fileOrFolder)
 			return fileMeta, nil
 		} else if !errors.Is(err, &types.ErrConfigNotFound{}) {
 			forgeErr = append(forgeErr, err)
+			debugInfo = append(debugInfo, fmt.Sprintf("%s: error - %v", fileOrFolder, err))
+		} else {
+			debugInfo = append(debugInfo, fmt.Sprintf("%s: file not found", fileOrFolder))
 		}
 	}
 
@@ -202,6 +225,7 @@ func (f *forgeFetcherContext) getFirstAvailableConfig(c context.Context, configs
 		return nil, errors.Join(forgeErr...)
 	}
 
-	// nothing found
+	// nothing found - include debug info about what we checked
+	log.Warn().Str("repo", f.repo.FullName).Msgf("No config found. Searched: %v", debugInfo)
 	return nil, &types.ErrConfigNotFound{Configs: configs}
 }

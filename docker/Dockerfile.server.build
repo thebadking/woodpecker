@@ -1,0 +1,54 @@
+# Build stage - builds the server binary with all dependencies
+FROM docker.io/golang:1.25 AS build
+
+WORKDIR /src
+COPY . .
+
+# Build UI and generate OpenAPI first
+ENV CI=true
+RUN apt-get update && apt-get install -y nodejs npm && \
+    npm install -g pnpm && \
+    cd web && \
+    pnpm install --frozen-lockfile && \
+    pnpm build && \
+    cd ..
+
+# Generate OpenAPI docs
+RUN CGO_ENABLED=0 go run github.com/swaggo/swag/cmd/swag fmt --exclude pipeline/rpc/proto && \
+    CGO_ENABLED=0 go generate cmd/server/openapi.go
+
+# Build the server binary with SQLite support
+# Use static linking for musl libc (Alpine)
+ARG TARGETOS=linux
+ARG TARGETARCH=amd64
+ARG CI_COMMIT_SHA
+ARG CI_COMMIT_TAG
+ARG CI_COMMIT_BRANCH
+
+RUN GOOS=${TARGETOS} GOARCH=${TARGETARCH} CGO_ENABLED=1 \
+    go build \
+    -tags 'netgo sqlite sqlite_unlock_notify' \
+    -ldflags "-extldflags=-static -X go.woodpecker-ci.org/woodpecker/v3/version.Version=${CI_COMMIT_TAG:-dev}" \
+    -o /build/woodpecker-server \
+    go.woodpecker-ci.org/woodpecker/v3/cmd/server
+
+# Final stage - minimal Alpine image
+FROM docker.io/alpine:3.23
+
+RUN apk add -U --no-cache ca-certificates && \
+  adduser -u 1000 -g 1000 woodpecker -D && \
+  mkdir -p /var/lib/woodpecker && \
+  chown -R woodpecker:woodpecker /var/lib/woodpecker
+
+ENV GODEBUG=netdns=go
+ENV WOODPECKER_IN_CONTAINER=true
+ENV XDG_CACHE_HOME=/var/lib/woodpecker
+ENV XDG_DATA_HOME=/var/lib/woodpecker
+EXPOSE 8000 9000 80 443
+
+COPY --from=build /build/woodpecker-server /bin/
+
+USER woodpecker
+
+HEALTHCHECK CMD ["/bin/woodpecker-server", "ping"]
+ENTRYPOINT ["/bin/woodpecker-server"]

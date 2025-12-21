@@ -302,31 +302,57 @@ func (c *Gitea) Dir(ctx context.Context, u *model.User, r *model.Repo, b *model.
 }
 
 func (c *Gitea) dirRecursive(ctx context.Context, u *model.User, r *model.Repo, b *model.Pipeline, path string, maxDepth, currentDepth int, client *gitea.Client) ([]*forge_types.FileMeta, error) {
+	log.Info().Str("repo", r.FullName).Str("path", path).Str("commit", b.Commit).Int("depth", currentDepth).Int("maxDepth", maxDepth).Msg("Gitea dirRecursive() called")
 	var configs []*forge_types.FileMeta
 
 	// List files in repository
+	log.Debug().Str("repo", r.FullName).Str("owner", r.Owner).Str("name", r.Name).Str("commit", b.Commit).Str("path", path).Msg("Calling Gitea ListContents API")
 	contents, resp, err := client.ListContents(r.Owner, r.Name, b.Commit, path)
 	if err != nil {
 		if resp != nil && resp.StatusCode == http.StatusNotFound {
+			log.Warn().Str("repo", r.FullName).Str("path", path).Int("status", resp.StatusCode).Msg("Gitea ListContents returned 404 - path not found")
 			return nil, errors.Join(err, &forge_types.ErrConfigNotFound{Configs: []string{path}})
 		}
+		log.Error().Str("repo", r.FullName).Str("path", path).Err(err).Msg("Gitea ListContents failed with error")
 		return nil, err
 	}
 
+	// Log what we found for debugging
+	log.Debug().Str("repo", r.FullName).Str("path", path).Msgf("Gitea ListContents returned %d items", len(contents))
+	var allItems []string
+	var fileItems []string
+	var dirItems []string
 	for _, e := range contents {
+		itemInfo := fmt.Sprintf("%s (type=%s, path=%s)", e.Name, e.Type, e.Path)
+		allItems = append(allItems, itemInfo)
 		if e.Type == "file" {
-			data, err := c.File(ctx, u, r, b, e.Path)
+			fileItems = append(fileItems, e.Name)
+		} else if e.Type == "dir" {
+			dirItems = append(dirItems, e.Name)
+		}
+	}
+	log.Info().Str("repo", r.FullName).Str("path", path).Msgf("Directory contents - Files: %v, Dirs: %v, All items: %v", fileItems, dirItems, allItems)
+
+	for _, e := range contents {
+		// CRITICAL FIX: Construct full path using path + "/" + e.Name
+		// NOT e.Path which is relative to the current directory
+		fullPath := path + "/" + e.Name
+
+		if e.Type == "file" {
+			log.Debug().Str("repo", r.FullName).Msgf("Fetching file: %s (from e.Name=%s, e.Path=%s)", fullPath, e.Name, e.Path)
+			data, err := c.File(ctx, u, r, b, fullPath)
 			if err != nil {
-				return nil, fmt.Errorf("multi-pipeline cannot get %s: %w", e.Path, err)
+				return nil, fmt.Errorf("multi-pipeline cannot get %s: %w", fullPath, err)
 			}
 
 			configs = append(configs, &forge_types.FileMeta{
-				Name: e.Path,
+				Name: fullPath,
 				Data: data,
 			})
 		} else if e.Type == "dir" && currentDepth < maxDepth {
 			// Recursively scan subdirectories if we haven't reached max depth
-			subConfigs, err := c.dirRecursive(ctx, u, r, b, e.Path, maxDepth, currentDepth+1, client)
+			log.Debug().Str("repo", r.FullName).Str("subdir", fullPath).Msgf("Recursing into subdirectory at depth %d", currentDepth+1)
+			subConfigs, err := c.dirRecursive(ctx, u, r, b, fullPath, maxDepth, currentDepth+1, client)
 			if err != nil {
 				return nil, err
 			}
@@ -334,6 +360,7 @@ func (c *Gitea) dirRecursive(ctx context.Context, u *model.User, r *model.Repo, 
 		}
 	}
 
+	log.Info().Str("repo", r.FullName).Str("path", path).Msgf("Returning %d config files from dirRecursive() at depth %d", len(configs), currentDepth)
 	return configs, nil
 }
 

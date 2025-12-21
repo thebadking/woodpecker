@@ -91,16 +91,23 @@ func Create(ctx context.Context, _store store.Store, repo *model.Repo, pipeline 
 		return nil, updatePipelineWithErr(ctx, _forge, _store, pipeline, repo, repoUser, fmt.Errorf("could not load config from forge: %w", configFetchErr))
 	}
 
+	configFileNames := make([]string, len(forgeYamlConfigs))
+	for i, cfg := range forgeYamlConfigs {
+		configFileNames[i] = cfg.Name
+	}
+	log.Debug().Str("repo", repo.FullName).Msgf("parsing %d config files: %v", len(forgeYamlConfigs), configFileNames)
+
 	pipelineItems, parseErr := parsePipeline(_forge, _store, pipeline, repoUser, repo, forgeYamlConfigs, nil)
 	if pipeline_errors.HasBlockingErrors(parseErr) {
-		log.Debug().Str("repo", repo.FullName).Err(parseErr).Msg("failed to parse yaml")
+		log.Error().Str("repo", repo.FullName).Err(parseErr).Msgf("failed to parse yaml files %v", configFileNames)
 		return pipeline, updatePipelineWithErr(ctx, _forge, _store, pipeline, repo, repoUser, parseErr)
 	} else if parseErr != nil {
+		log.Warn().Str("repo", repo.FullName).Err(parseErr).Msgf("non-blocking parse errors in files %v", configFileNames)
 		pipeline.Errors = pipeline_errors.GetPipelineErrors(parseErr)
 	}
 
 	if len(pipelineItems) == 0 {
-		log.Debug().Str("repo", repo.FullName).Msg(ErrFiltered.Error())
+		log.Warn().Str("repo", repo.FullName).Msgf("no pipeline items generated from config files %v - pipeline will be filtered out", configFileNames)
 		if err := _store.DeletePipeline(pipeline); err != nil {
 			log.Error().Str("repo", repo.FullName).Err(err).Msg("failed to delete empty pipeline")
 		}

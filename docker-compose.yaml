@@ -1,0 +1,47 @@
+services:
+  woodpecker-server:
+    image: woodpecker-server:dc2334794
+    container_name: woodpecker-server
+    restart: unless-stopped
+    networks:
+      - traefik-network
+    volumes:
+      - woodpecker-data:/var/lib/woodpecker
+    environment:
+      - WOODPECKER_HOST=${WOODPECKER_SERVER_URL}
+      - WOODPECKER_AGENT_SECRET=${WOODPECKER_AGENT_SECRET}
+      - WOODPECKER_ADMIN=${WOODPECKER_ADMIN_USERS}
+      - WOODPECKER_GITEA=true
+      - WOODPECKER_GITEA_URL=${GITEA_URL}
+      - WOODPECKER_GITEA_CLIENT=${WOODPECKER_GITEA_CLIENT_ID}
+      - WOODPECKER_GITEA_SECRET=${WOODPECKER_GITEA_CLIENT_SECRET}
+      - WOODPECKER_GITEA_SKIP_VERIFY=false
+      - WOODPECKER_OPEN=true
+      - WOODPECKER_ORGS=safemetrics
+      - WOODPECKER_GRPC_ADDR=:9000
+      - WOODPECKER_LOG_LEVEL=debug
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=traefik-network"
+      # UI Route (Port 8000)
+      - "traefik.http.routers.woodpecker-ui.rule=Host(`${WOODPECKER_SERVER_HOSTNAME}`)"
+      - "traefik.http.routers.woodpecker-ui.entrypoints=websecure"
+      - "traefik.http.routers.woodpecker-ui.tls=true"
+      - "traefik.http.routers.woodpecker-ui.tls.certresolver=devresolver"
+      - "traefik.http.routers.woodpecker-ui.service=woodpecker-ui-service"
+      - "traefik.http.services.woodpecker-ui-service.loadbalancer.server.port=8000"
+      # gRPC Configuration
+      - "traefik.http.routers.woodpecker-grpc.rule=Host(`grpc.${WOODPECKER_SERVER_HOSTNAME}`)"
+      - "traefik.http.routers.woodpecker-grpc.entrypoints=websecure"
+      - "traefik.http.routers.woodpecker-grpc.tls=true"
+      - "traefik.http.routers.woodpecker-grpc.tls.certresolver=devresolver"
+      - "traefik.http.routers.woodpecker-grpc.service=woodpecker-grpc-service"
+      - "traefik.http.services.woodpecker-grpc-service.loadbalancer.server.port=9000"
+      - "traefik.http.services.woodpecker-grpc-service.loadbalancer.server.scheme=h2c"
+volumes:
+  woodpecker-data:
+    external: false
+    name: git_woodpecker-data
+networks:
+  traefik-network:
+    external: true

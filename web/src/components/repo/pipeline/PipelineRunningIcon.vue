@@ -26,9 +26,4 @@ import WoodpeckerIcon from '~/assets/woodpecker.svg?component';
     transform: rotate(5deg) translateX(5%);
   }
 }
-
-.woodpecker ::v-deep(path) {
-  animation: peck 1s ease infinite;
-  @apply fill-wp-text-100;
-}
 </style>

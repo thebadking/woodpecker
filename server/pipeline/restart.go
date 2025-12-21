@@ -72,7 +72,9 @@ func Restart(ctx context.Context, store store.Store, lastPipeline *model.Pipelin
 	}
 
 	if len(configs) == 0 {
-		newPipeline, uErr := UpdateToStatusError(store, *newPipeline, errors.New("pipeline definition not found"))
+		errMsg := fmt.Sprintf("pipeline definition not found: no config files were retrieved from previous pipeline #%d. This may indicate the config was never saved or the config path has changed.", lastPipeline.Number)
+		log.Error().Str("repo", repo.FullName).Msgf(errMsg)
+		newPipeline, uErr := UpdateToStatusError(store, *newPipeline, errors.New(errMsg))
 		if uErr != nil {
 			log.Debug().Err(uErr).Msg("failure to update pipeline status")
 		} else {
